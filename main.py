@@ -1,20 +1,29 @@
+import os
 import io
 import json
+
+# FastAPI & Pydantic
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+
+# LINE Bot
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageMessage, FlexSendMessage
+
+# AI & Image Processing
 import google.generativeai as genai
 from PIL import Image
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# Database (SQLAlchemy)
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+
+# Environment Variables
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI()
 
@@ -29,8 +38,20 @@ handler = WebhookHandler(CHANNEL_SECRET)
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-DATABASE_URL = "sqlite:///./trip_sharing.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# 1. ดึง URL จาก Render (ถ้าไม่มีจะใช้ sqlite ในเครื่องแทน)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./trip_sharing.db")
+
+# 2. แปลง postgres:// เป็น postgresql:// (สำคัญมาก ไม่งั้น SQLAlchemy จะอ่านไม่ออก)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# 3. สร้าง engine (แยกกรณีระหว่าง SQLite กับ Postgres)
+if "sqlite" in DATABASE_URL:
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL) # Postgres ไม่ต้องใช้ check_same_thread
+
+# 4. สร้าง Session และ Base ตามปกติ
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
